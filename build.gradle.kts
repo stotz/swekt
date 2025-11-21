@@ -29,7 +29,7 @@ java {
 }
 
 application {
-    mainClass.set("ch.typedef.MainKt")
+    mainClass.set("ch.typedef.swekt.MainKt")
 }
 
 tasks.test {

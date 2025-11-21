@@ -1,4 +1,4 @@
-package ch.typedef
+package ch.typedef.swekt
 
 /**
  * Main entry point for swekt
