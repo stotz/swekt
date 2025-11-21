@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "ch.typedef"
-version = "0.0.1"
+version = "0.0.2"
 
 repositories {
     mavenCentral()
@@ -16,6 +16,8 @@ dependencies {
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.mockk)
 }
 
 kotlin {
@@ -29,7 +31,7 @@ java {
 }
 
 application {
-    mainClass.set("ch.typedef.swekt.MainKt")
+    mainClass.set("ch.typedef.MainKt")
 }
 
 tasks.test {
@@ -40,7 +42,7 @@ tasks.jar {
     manifest {
         attributes(
             "Implementation-Title" to "swekt",
-            "Implementation-Version" to "0.0.1",
+            "Implementation-Version" to version,
             "Implementation-Vendor" to "Urs Stotz - Entwicklung"
         )
     }
