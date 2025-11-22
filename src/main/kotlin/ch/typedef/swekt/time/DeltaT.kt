@@ -200,12 +200,21 @@ object DeltaT {
 
     /**
      * Convert Julian Day to decimal year
-     * Simplified conversion for Delta T calculations
+     * Uses proper Gregorian calendar conversion
      */
     private fun jdToYear(jd: Double): Double {
-        // J2000 = 2000.0
-        // 1 year ≈ 365.25 days
-        return 2000.0 + (jd - J2000) / 365.25
+        // Use JulianDay's Gregorian conversion
+        val julianDay = JulianDay(jd)
+        val greg = julianDay.toGregorian()
+        
+        // Calculate day of year
+        val dayOfYear = greg.day + (greg.hour / 24.0)
+        
+        // Days in year (365 or 366 for leap year)
+        val daysInYear = if (JulianDay.isLeapYear(greg.year)) 366.0 else 365.0
+        
+        // Return decimal year
+        return greg.year.toDouble() + (greg.month - 1) * 30.5 / daysInYear + dayOfYear / daysInYear
     }
 
     /**

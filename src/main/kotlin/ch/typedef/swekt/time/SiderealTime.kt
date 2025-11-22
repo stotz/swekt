@@ -48,7 +48,7 @@ object SiderealTime {
      * Calculates Greenwich Mean Sidereal Time (GMST) for a given Julian Day.
      *
      * GMST is the hour angle of the mean vernal equinox at Greenwich.
-     * This uses the IAU 2006 formula.
+     * This uses the IAU 1976 formula.
      *
      * @param julianDay Julian Day (UT)
      * @return GMST in hours (0-24)
@@ -59,30 +59,31 @@ object SiderealTime {
         
         // Split into midnight and time of day
         val jd0 = floor(jd - 0.5) + 0.5 // Midnight before
-        var fraction = jd - jd0
-        if (fraction < 0.0) fraction += 1.0
+        val secs = (jd - jd0) * 86400.0  // Seconds since midnight
         
-        // Calculate GMST at 0h UT
-        val gmst0 = calculateGMST0(julianDay)
+        // Centuries from J2000 for UT
+        val tu = (jd0 - J2000) / 36525.0
         
-        // Add time since 0h UT
-        // Sidereal day is 1.00273790935 solar days
-        val siderealRate = 1.00273790935
-        val gmstHours = gmst0 + fraction * 24.0 * siderealRate
+        // IAU 1976 formula - GMST at 0h UT in seconds
+        var gmst = ((-6.2e-6 * tu + 9.3104e-2) * tu + 8640184.812866) * tu + 24110.54841
         
-        // Normalize to 0-24 hours
-        return normalizeHours(gmstHours)
+        // Mean solar days per sidereal day at date tu
+        val msday = 1.0 + ((-1.86e-5 * tu + 0.186208) * tu + 8640184.812866) / (86400.0 * 36525.0)
+        
+        // Add time since midnight
+        gmst += msday * secs
+        
+        // Normalize to 0-86400 seconds (one sidereal day)
+        gmst = gmst - 86400.0 * floor(gmst / 86400.0)
+        
+        // Convert to hours and return
+        return gmst / 3600.0
     }
 
     /**
      * Calculates GMST at 0h UT (midnight) for a given date.
      *
-     * Formula from IAU 2006:
-     * GMST0 = 6.697374558 + 0.06570982441908 * D + 0.000026 * T²
-     *
-     * where:
-     * - D = days from J2000.0
-     * - T = centuries from J2000.0
+     * Formula from IAU 1976.
      *
      * @param julianDay Julian Day (UT)
      * @return GMST at 0h UT in hours (0-24)
@@ -93,18 +94,17 @@ object SiderealTime {
         val jd = julianDay.value
         val jd0 = floor(jd - 0.5) + 0.5
         
-        // Days from J2000.0
-        val d = jd0 - J2000
+        // Centuries from J2000
+        val tu = (jd0 - J2000) / 36525.0
         
-        // Centuries from J2000.0
-        val t = d / 36525.0
+        // IAU 1976 formula - GMST at 0h UT in seconds
+        var gmst = ((-6.2e-6 * tu + 9.3104e-2) * tu + 8640184.812866) * tu + 24110.54841
         
-        // IAU 2006 formula
-        val gmst0 = 6.697374558 + 
-                    0.06570982441908 * d + 
-                    0.000026 * t * t
+        // Normalize to 0-86400 seconds
+        gmst = gmst - 86400.0 * floor(gmst / 86400.0)
         
-        return normalizeHours(gmst0)
+        // Convert to hours
+        return gmst / 3600.0
     }
 
     /**
