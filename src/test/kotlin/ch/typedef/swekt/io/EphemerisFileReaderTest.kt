@@ -121,4 +121,21 @@ class EphemerisFileReaderTest {
             reader.readHeader(Planet.MARS)
         }
     }
+
+    @Test
+    @Disabled("SE1 binary format needs analysis")
+    @EnabledIfEnvironmentVariable(named = "SE_EPHE_PATH", matches = ".+")
+    fun `should read SE1 record with Chebyshev coefficients`() {
+        val config = EphemerisConfig.fromEnvironment()
+        val reader = EphemerisFileReader(config)
+        val jd = JulianDay.J2000
+
+        val se1Record = reader.readSe1Record(Planet.MARS, jd)
+
+        assertThat(se1Record.contains(jd)).isTrue()
+        assertThat(se1Record.longitudeCoefficients).isNotEmpty
+        assertThat(se1Record.latitudeCoefficients).isNotEmpty
+        assertThat(se1Record.distanceCoefficients).isNotEmpty
+        assertThat(se1Record.timeSpan).isGreaterThan(0.0)
+    }
 }

@@ -1,134 +1,120 @@
 package ch.typedef.swekt.examples
 
 import ch.typedef.swekt.calculation.SwissEphemerisEngine
-import ch.typedef.swekt.io.Se1Record
+import ch.typedef.swekt.config.EphemerisConfig
+import ch.typedef.swekt.io.EphemerisFileReader
 import ch.typedef.swekt.model.JulianDay
 import ch.typedef.swekt.model.Planet
 
 /**
- * Demonstrates Swiss Ephemeris Engine with Chebyshev interpolation.
+ * Example: High-precision planetary calculations using Swiss Ephemeris SE1 files.
  *
- * Shows how SE1 records are used to calculate high-precision
- * planetary positions.
+ * This example demonstrates the complete workflow:
+ * 1. Configure ephemeris path
+ * 2. Read SE1 binary data (Chebyshev coefficients)
+ * 3. Calculate high-precision positions
+ *
+ * Requirements:
+ * - SE_EPHE_PATH environment variable set
+ * - Swiss Ephemeris SE1 files installed
  */
 fun main() {
-    println("=== Swiss Ephemeris Engine Demo ===\n")
-
-    // Create a simulated SE1 record (normally read from .se1 file)
-    println("1. Creating SE1 Record:")
-    val startJd = JulianDay(2451545.0)  // J2000.0
-    val endJd = JulianDay(2451577.0)    // 32 days later
-    
-    val record = Se1Record(
-        startJulianDay = startJd,
-        endJulianDay = endJd,
-        // Mars longitude coefficients (degrees)
-        longitudeCoefficients = doubleArrayOf(
-            355.4523,   // Mean longitude
-            16.2134,    // Linear term (motion)
-            -0.0234,    // Quadratic correction
-            0.0012,     // Cubic correction
-            -0.0001     // Higher order
-        ),
-        // Mars latitude coefficients (degrees)
-        latitudeCoefficients = doubleArrayOf(
-            1.8456,     // Mean latitude
-            0.1234,     // Linear term
-            -0.0023     // Quadratic
-        ),
-        // Mars distance coefficients (AU)
-        distanceCoefficients = doubleArrayOf(
-            1.5237,     // Mean distance
-            0.0024,     // Linear term
-            -0.00001    // Quadratic
-        )
-    )
-    
-    println("   Time range: ${startJd.value} to ${endJd.value}")
-    println("   Span: ${String.format("%.1f", record.timeSpan)} days")
-    println("   Coefficients: ${record.longitudeCoefficients.size}, " +
-            "${record.latitudeCoefficients.size}, ${record.distanceCoefficients.size}")
+    println("Swiss Ephemeris SE1 Calculation Example")
+    println("=".repeat(50))
     println()
 
-    // Create engine
-    println("2. Calculating Mars positions:\n")
-    val engine = SwissEphemerisEngine()
-    
-    // Calculate at several points
-    println("   Julian Day    Date         Longitude  Latitude  Distance   Speed")
-    println("   ------------- ------------ ---------- --------- ---------- -------")
-    
-    for (offset in 0..32 step 8) {
-        val jd = JulianDay(startJd.value + offset)
-        
-        // This is where the magic happens!
-        // Chebyshev interpolation calculates position from coefficients
-        val position = engine.calculateFromRecord(Planet.MARS, jd, record)
-        
+    // Check if ephemeris files are available
+    val ephePath = System.getenv("SE_EPHE_PATH")
+    if (ephePath == null) {
+        println("ERROR: SE_EPHE_PATH environment variable not set")
+        println("Please set it to your Swiss Ephemeris data directory")
+        println("Example: export SE_EPHE_PATH=/usr/share/swisseph")
+        return
+    }
+
+    try {
+        // 1. Configure
+        println("Configuration:")
+        println("  Ephemeris Path: $ephePath")
+        val config = EphemerisConfig.fromEnvironment()
+        val reader = EphemerisFileReader(config)
+        val engine = SwissEphemerisEngine()
+        println()
+
+        // 2. Calculate positions at J2000.0
+        val jd = JulianDay.J2000
         val gregorian = jd.toGregorian()
-        val dateStr = "%04d-%02d-%02d".format(
-            gregorian.year, 
-            gregorian.month, 
-            gregorian.day
+        println("Calculating positions for:")
+        println("  Julian Day: ${jd.value}")
+        println("  Date: ${gregorian.year}-${gregorian.month.toString().padStart(2, '0')}-${gregorian.day.toString().padStart(2, '0')}")
+        println()
+
+        // 3. Calculate for each planet
+        val planets = listOf(
+            Planet.SUN,
+            Planet.MOON,
+            Planet.MERCURY,
+            Planet.VENUS,
+            Planet.MARS,
+            Planet.JUPITER,
+            Planet.SATURN
         )
-        
-        println("   %.1f  %s  %7.3f°  %6.3f°  %.6f AU  %.4f°/d".format(
-            jd.value,
-            dateStr,
-            position.longitude,
-            position.latitude,
-            position.distance,
-            position.longitudeSpeed
-        ))
+
+        println("Planetary Positions (Heliocentric Ecliptic):")
+        println("-".repeat(50))
+        println("Planet      Longitude    Latitude     Distance")
+        println("-".repeat(50))
+
+        for (planet in planets) {
+            try {
+                val record = reader.readSe1Record(planet, jd)
+                val position = engine.calculateFromRecord(planet, jd, record)
+
+                println(
+                    "%-10s  %9.4f°  %9.4f°  %9.6f AU".format(
+                        planet.displayName,
+                        position.longitude,
+                        position.latitude,
+                        position.distance
+                    )
+                )
+            } catch (e: Exception) {
+                println("%-10s  ERROR: ${e.message}".format(planet.displayName))
+            }
+        }
+
+        println("-".repeat(50))
+        println()
+
+        // 4. Detailed calculation for Mars
+        println("Detailed Mars Calculation:")
+        println("-".repeat(50))
+        val mars = Planet.MARS
+        val marsRecord = reader.readSe1Record(mars, jd)
+        val marsPos = engine.calculateFromRecord(mars, jd, marsRecord)
+
+        println("SE1 Record Information:")
+        println("  Time Range: ${marsRecord.startJulianDay.value} to ${marsRecord.endJulianDay.value}")
+        println("  Time Span: %.1f days".format(marsRecord.timeSpan))
+        println("  Coefficients: ${marsRecord.longitudeCoefficients.size} per coordinate")
+        println()
+
+        println("Position:")
+        println("  Longitude: %.6f°".format(marsPos.longitude))
+        println("  Latitude:  %.6f°".format(marsPos.latitude))
+        println("  Distance:  %.8f AU".format(marsPos.distance))
+        println()
+
+        println("Velocity:")
+        println("  Longitude Speed: %.8f°/day".format(marsPos.longitudeSpeed))
+        println("  Latitude Speed:  %.8f°/day".format(marsPos.latitudeSpeed))
+        println("  Distance Speed:  %.8f AU/day".format(marsPos.distanceSpeed))
+        println()
+
+        println("Calculation complete!")
+
+    } catch (e: Exception) {
+        println("ERROR: ${e.message}")
+        e.printStackTrace()
     }
-    println()
-
-    // Compare start vs end
-    println("3. Motion Analysis:")
-    val posStart = engine.calculateFromRecord(Planet.MARS, startJd, record)
-    val posEnd = engine.calculateFromRecord(Planet.MARS, endJd, record)
-    
-    val lonChange = posEnd.longitude - posStart.longitude
-    val distChange = posEnd.distance - posStart.distance
-    
-    println("   Longitude change: ${String.format("%.3f", lonChange)}° over 32 days")
-    println("   Average speed: ${String.format("%.4f", lonChange / 32.0)}°/day")
-    println("   Distance change: ${String.format("%.6f", distChange)} AU")
-    println()
-
-    // Show Chebyshev interpolation at work
-    println("4. Interpolation at different times:")
-    
-    for (fraction in listOf(0.0, 0.25, 0.5, 0.75, 1.0)) {
-        val jd = JulianDay(startJd.value + fraction * record.timeSpan)
-        val pos = engine.calculateFromRecord(Planet.MARS, jd, record)
-        
-        println("   At ${(fraction * 100).toInt()}% through interval: " +
-                "lon=${String.format("%.3f", pos.longitude)}°, " +
-                "speed=${String.format("%.4f", pos.longitudeSpeed)}°/day")
-    }
-    println()
-
-    // Demonstrate velocity calculation
-    println("5. Velocity Details (at midpoint):")
-    val midJd = record.midpoint
-    val midPos = engine.calculateFromRecord(Planet.MARS, midJd, record)
-    
-    println("   Julian Day: ${midJd.value}")
-    println("   Longitude:  ${String.format("%.6f", midPos.longitude)}°")
-    println("   Longitude Speed: ${String.format("%.6f", midPos.longitudeSpeed)}°/day")
-    println("   Latitude:   ${String.format("%.6f", midPos.latitude)}°")
-    println("   Latitude Speed:  ${String.format("%.6f", midPos.latitudeSpeed)}°/day")
-    println("   Distance:   ${String.format("%.8f", midPos.distance)} AU")
-    println("   Distance Speed:  ${String.format("%.8f", midPos.distanceSpeed)} AU/day")
-    println()
-
-    println("=== Done ===")
-    println()
-    println("This is how Swiss Ephemeris calculates planetary positions!")
-    println("Production implementation would:")
-    println("  1. Read SE1 files from disk")
-    println("  2. Find the right record for requested Julian Day")
-    println("  3. Use Chebyshev interpolation (as shown above)")
-    println("  4. Apply coordinate transformations as needed")
 }

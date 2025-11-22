@@ -66,6 +66,35 @@ class EphemerisFileReader(private val config: EphemerisConfig) {
     }
 
     /**
+     * Reads SE1 record for planet at given time.
+     *
+     * This is the new high-precision method using Chebyshev coefficients.
+     *
+     * @param planet Planet to read
+     * @param julianDay Time
+     * @return SE1 record with Chebyshev coefficients
+     * @throws IllegalArgumentException if no data available
+     */
+    fun readSe1Record(planet: Planet, julianDay: JulianDay): Se1Record {
+        val file = findFile(planet) ?: throw IllegalArgumentException(
+            "No ephemeris file found for planet ${planet.displayName}"
+        )
+        
+        val header = readHeader(planet)
+        
+        // Validate time range
+        require(julianDay.value >= header.startJD && julianDay.value <= header.endJD) {
+            "Julian Day ${julianDay.value} outside file range ${header.startJD} - ${header.endJD}"
+        }
+        
+        // Read using binary reader
+        val reader = Se1BinaryReader(file)
+        return reader.findRecord(julianDay) ?: throw IllegalArgumentException(
+            "No SE1 record found for Julian Day ${julianDay.value} in file $file"
+        )
+    }
+
+    /**
      * Finds ephemeris file for planet.
      *
      * @param planet Planet

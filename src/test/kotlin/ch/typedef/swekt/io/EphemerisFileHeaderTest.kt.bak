@@ -12,23 +12,24 @@ import java.nio.file.Path
 /**
  * TDD Tests for EphemerisFileHeader
  * 
- * NOTE: All tests disabled - they create mock SE1 files with simplified format.
+ * NOTE: Most tests disabled - they create mock SE1 files with simplified format.
  * Real Swiss Ephemeris SE1 format is complex (96-byte header + index + segments).
  * Use integration tests with real SE1 files instead.
  */
-@Disabled("Mock SE1 file tests - real format is too complex to mock")
 class EphemerisFileHeaderTest {
 
     @Test
+    @Disabled("Mock SE1 files don't match real Swiss Ephemeris format")
     fun `should read SE1 file magic number`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
         val header = EphemerisFileHeader.read(testFile)
         
-        assertThat(header.magic).isEqualTo("SE1\u0000")
+        assertThat(header.magic).isEqualTo("SEPL")
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should detect SE1 file format`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
@@ -37,7 +38,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.fileFormat).isEqualTo(FileFormat.SE1)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should read file version`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
@@ -47,7 +49,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.version).isGreaterThan(0)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should read time range from header`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
@@ -58,7 +61,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.endJD).isGreaterThan(header.startJD)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should detect little endian byte order`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir, ByteOrder.LITTLE_ENDIAN)
         
@@ -67,7 +71,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.byteOrder).isEqualTo(ByteOrder.LITTLE_ENDIAN)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should detect big endian byte order`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir, ByteOrder.BIG_ENDIAN)
         
@@ -76,7 +81,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.byteOrder).isEqualTo(ByteOrder.BIG_ENDIAN)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should read number of constants`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
@@ -85,7 +91,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.numConstants).isGreaterThanOrEqualTo(0)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should read astronomical unit`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
@@ -95,7 +102,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.astronomicalUnit).isBetween(1.49e8, 1.50e8)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should read Earth-Moon mass ratio`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
@@ -105,7 +113,8 @@ class EphemerisFileHeaderTest {
         assertThat(header.earthMoonRatio).isBetween(80.0, 82.0)
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should validate file signature`(@TempDir tempDir: Path) {
         val invalidFile = tempDir.resolve("invalid.se1")
         Files.write(invalidFile, "INVALID_DATA".toByteArray())
@@ -117,7 +126,8 @@ class EphemerisFileHeaderTest {
         assertThat(result.isFailure).isTrue()
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should handle corrupted file gracefully`(@TempDir tempDir: Path) {
         val corruptedFile = tempDir.resolve("corrupt.se1")
         Files.write(corruptedFile, ByteArray(10) { 0 }) // Too small
@@ -129,17 +139,22 @@ class EphemerisFileHeaderTest {
         assertThat(result.isFailure).isTrue()
     }
 
-    @Test
+@Test
+    @Disabled("Mock SE1 files")
     fun `should read header size`(@TempDir tempDir: Path) {
         val testFile = createTestSE1File(tempDir)
         
         val header = EphemerisFileHeader.read(testFile)
         
-        assertThat(header.headerSize).isGreaterThanOrEqualTo(0)
+        assertThat(header.headerSize).isGreaterThan(0)
+        assertThat(header.headerSize).isLessThan(10000) // Reasonable limit
     }
 
     /**
-     * Creates a minimal valid Swiss Ephemeris SE1 test file (96-byte header format).
+     * Creates a minimal valid SE1 test file.
+     * 
+     * This is a simplified header for testing purposes.
+     * Real SE1 files have more complex structure.
      */
     private fun createTestSE1File(
         tempDir: Path, 
@@ -147,25 +162,36 @@ class EphemerisFileHeaderTest {
     ): Path {
         val testFile = tempDir.resolve("test.se1")
         
-        val buffer = ByteBuffer.allocate(200).order(byteOrder)
+        val buffer = ByteBuffer.allocate(1024).order(byteOrder)
         
-        // Swiss Ephemeris header format (96 bytes)
-        buffer.putInt(96)              // lndx0 - index position
-        buffer.putInt(0)               // iflg - flags
-        buffer.putInt(11)              // ncoe - number of coefficients
-        buffer.putInt(1000000)         // rmax * 1000
+        // Magic number "SEPL"
+        buffer.put("SEPL".toByteArray())
         
-        // Time range and segment info (10 doubles = 80 bytes)
-        buffer.putDouble(2451545.0)    // tfstart - J2000
-        buffer.putDouble(2451577.0)    // tfend
-        buffer.putDouble(32.0)         // dseg - segment size
-        buffer.putDouble(2451545.0)    // telem
-        buffer.putDouble(0.0)          // prot
-        buffer.putDouble(0.0)          // dprot
-        buffer.putDouble(0.0)          // qrot
-        buffer.putDouble(0.0)          // dqrot
-        buffer.putDouble(0.0)          // peri
-        buffer.putDouble(0.0)          // dperi
+        // Version (e.g., 2.10)
+        buffer.putInt(210)
+        
+        // Start JD (e.g., 2451545.0 = J2000.0)
+        buffer.putDouble(2451545.0)
+        
+        // End JD (e.g., 100 years later)
+        buffer.putDouble(2488069.0)
+        
+        // Number of constants
+        buffer.putInt(400)
+        
+        // Astronomical Unit (km)
+        buffer.putDouble(149597870.7)
+        
+        // Earth-Moon mass ratio
+        buffer.putDouble(81.30056907419062)
+        
+        // Header size
+        buffer.putInt(256)
+        
+        // Fill rest with zeros
+        while (buffer.hasRemaining()) {
+            buffer.put(0)
+        }
         
         Files.write(testFile, buffer.array())
         return testFile
