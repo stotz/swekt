@@ -181,7 +181,7 @@ public class PlanetSwissEphNetJavaInteropTest {
         
         assertThat(planets)
             .describedAs("All planets")
-            .hasSize(12);
+            .hasSize(13);  // Now includes EARTH
     }
 
     /**
@@ -223,7 +223,7 @@ public class PlanetSwissEphNetJavaInteropTest {
         String result = switch (planet) {
             case SUN -> "Star";
             case MOON -> "Satellite";
-            case MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE -> "Planet";
+            case MERCURY, VENUS, EARTH, MARS, JUPITER, SATURN, URANUS, NEPTUNE -> "Planet";
             case PLUTO -> "Dwarf Planet";
             case MEAN_NODE, TRUE_NODE -> "Lunar Node";
         };
@@ -253,12 +253,12 @@ public class PlanetSwissEphNetJavaInteropTest {
     void iteratingOverPlanetsShouldWorkFromJava() {
         int count = 0;
         for (Planet planet : Planet.values()) {
-            assertThat(planet.getId()).isBetween(0, 11);
+            assertThat(planet.getId()).isIn(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13);  // EARTH has ID 13
             assertThat(planet.getDisplayName()).isNotEmpty();
             count++;
         }
         
-        assertThat(count).isEqualTo(12);
+        assertThat(count).isEqualTo(13);  // Now includes EARTH
     }
 
     /**

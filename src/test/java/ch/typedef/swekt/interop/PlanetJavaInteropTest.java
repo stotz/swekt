@@ -26,7 +26,7 @@ public class PlanetJavaInteropTest {
     public void shouldAccessAllEnumValues() {
         Planet[] planets = Planet.values();
         
-        assertThat(planets).hasSize(12);
+        assertThat(planets).hasSize(13);  // Now includes EARTH
         assertThat(planets[0]).isEqualTo(Planet.SUN);
     }
 

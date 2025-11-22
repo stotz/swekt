@@ -236,12 +236,12 @@ class PlanetSwissEphNetValidationTest {
         // Earth (ID 14) should not be in our Planet enum
         assertThat(Planet.fromId(14)).isNull()
         
-        // All planet IDs should be < 14 or in node range (10-11)
+        // All planet IDs should be < 14 or in node/earth range (10-11, 13)
         Planet.entries.forEach { planet ->
             if (planet.id >= 10) {
                 assertThat(planet.id)
                     .describedAs("Planet ${planet.name} ID")
-                    .isIn(10, 11) // Only nodes have IDs >= 10
+                    .isIn(10, 11, 13) // Nodes have IDs 10-11, EARTH has ID 13
             } else {
                 assertThat(planet.id)
                     .describedAs("Planet ${planet.name} ID")
@@ -258,7 +258,7 @@ class PlanetSwissEphNetValidationTest {
     fun `should have exactly 12 planets in enum`() {
         assertThat(Planet.entries)
             .describedAs("Total number of planets")
-            .hasSize(12)
+            .hasSize(13)  // Now includes EARTH for JPL calculations
     }
 
     /**
@@ -335,7 +335,7 @@ class PlanetSwissEphNetValidationTest {
         
         assertThat(allIds)
             .describedAs("All planet IDs")
-            .containsExactly(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+            .containsExactly(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13)  // EARTH = 13 for JPL
     }
 
     /**

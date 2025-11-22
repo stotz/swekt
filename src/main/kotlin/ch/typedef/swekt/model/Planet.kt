@@ -22,6 +22,7 @@ enum class Planet(
     MOON(1, "Moon", isClassical = true),
     MERCURY(2, "Mercury", isClassical = true),
     VENUS(3, "Venus", isClassical = true),
+    EARTH(13, "Earth"),  // Special case - Earth itself
     MARS(4, "Mars", isClassical = true),
     JUPITER(5, "Jupiter", isClassical = true),
     SATURN(6, "Saturn", isClassical = true),
