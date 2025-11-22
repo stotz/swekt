@@ -1,5 +1,7 @@
 package ch.typedef.swekt.model
 
+import ch.typedef.swekt.coordinates.*
+
 /**
  * Cartesian coordinates in 3D space.
  * 
@@ -46,6 +48,27 @@ data class CartesianCoordinates(
         return if (mag > 0) CartesianCoordinates(x / mag, y / mag, z / mag)
         else this
     }
+
+    /**
+     * Converts to ecliptic coordinates.
+     */
+    fun toEcliptic(): EclipticCoordinates =
+        CoordinateTransformations.cartesianToEcliptic(this)
+
+    /**
+     * Converts to equatorial coordinates.
+     */
+    fun toEquatorial(): EquatorialCoordinates =
+        CoordinateTransformations.cartesianToEquatorial(this)
+
+    /**
+     * Converts to horizontal coordinates for an observer.
+     *
+     * @param observerLatitude Observer's latitude in degrees
+     * @param localSiderealTime Local Sidereal Time in hours
+     */
+    fun toHorizontal(observerLatitude: Double, localSiderealTime: Double): HorizontalCoordinates =
+        CoordinateTransformations.cartesianToHorizontal(this, observerLatitude, localSiderealTime)
 }
 
 /**
@@ -134,4 +157,23 @@ data class BodyPosition(
      * Speed in km/day (if velocity is available).
      */
     fun speed(): Double? = velocity?.magnitude()
+
+    /**
+     * Converts position to ecliptic coordinates.
+     */
+    fun toEcliptic(): EclipticCoordinates = position.toEcliptic()
+
+    /**
+     * Converts position to equatorial coordinates.
+     */
+    fun toEquatorial(): EquatorialCoordinates = position.toEquatorial()
+
+    /**
+     * Converts position to horizontal coordinates for an observer.
+     *
+     * @param observerLatitude Observer's latitude in degrees
+     * @param localSiderealTime Local Sidereal Time in hours
+     */
+    fun toHorizontal(observerLatitude: Double, localSiderealTime: Double): HorizontalCoordinates =
+        position.toHorizontal(observerLatitude, localSiderealTime)
 }
