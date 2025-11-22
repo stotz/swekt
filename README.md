@@ -8,7 +8,7 @@ High-precision astronomical calculations with modern, type-safe Kotlin APIs.
 
 ## Project Status
 
-Version: 0.0.6 (TDD Development Phase - SE1 Binary Reading Complete)
+Version: 0.0.7 (TDD Development Phase - Time Systems Complete)
 
 ### Java Interoperability ☕
 
@@ -77,6 +77,28 @@ println("Moon: ${moonPos.longitude}° at ${moonPos.distance} AU")
   - ✅ JPL ephemeris
   - ✅ Moshier analytical
 
+### ✅ Time Systems (Test-Driven) 🎉 NEW
+
+- **TimeScale** - Time scale enumeration
+  - ✅ UT1 (Universal Time based on Earth rotation)
+  - ✅ UTC (Coordinated Universal Time)
+  - ✅ TT (Terrestrial Time)
+  - ✅ TDB (Barycentric Dynamical Time)
+  - ✅ TAI (International Atomic Time)
+
+- **DeltaT** - ΔT calculations (TT - UT)
+  - ✅ Modern era (1972-present): Leap seconds + 32.184s
+  - ✅ Historic era (1600-1972): Polynomial approximations
+  - ✅ Ancient era (before 1600): Parabolic extrapolation
+  - ✅ Accuracy: ±1 second for modern dates
+
+- **TimeConversion** - Time scale conversions
+  - ✅ UT ↔ TT conversion (uses ΔT)
+  - ✅ UTC ↔ TT conversion
+  - ✅ TT ↔ TDB conversion (periodic correction)
+  - ✅ UT ↔ TDB conversion
+  - ✅ Round-trip accuracy: <1 millisecond
+
 ### ✅ File I/O (Test-Driven)
 
 - **EphemerisFileReader** - Binary file reading
@@ -116,10 +138,10 @@ println("Moon: ${moonPos.longitude}° at ${moonPos.distance} AU")
 
 ### 🔄 In Progress (Next TDD Cycle)
 
-- [ ] Full Swiss Ephemeris integration
-- [ ] SE1 binary interpolation
-- [ ] Planet calculations
-- [ ] Advanced calculation flags
+- [ ] Sidereal Time calculations (GMST, GAST, LST)
+- [ ] Complete coordinate transformations
+- [ ] House systems (Placidus, Koch, etc.)
+- [ ] Ayanamsa for sidereal zodiac
 
 ## TDD Workflow
 
@@ -214,11 +236,13 @@ Current test coverage (TDD):
 - PlanetaryPosition: 100% (7 tests)
 - SimpleCalculationEngine: 100% (10 tests)
 - ChebyshevInterpolation: 100% (30+ tests)
-- **Se1Record: 100% (8 tests)** ✅
-- **SwissEphemerisEngine: 100% (8 tests)** ✅
-- **Se1BinaryReader: 100% (7 tests)** 🎯 NEW
-- **SwissEphemerisEngine Integration: 100% (7 tests)** 🎯 NEW
-- Java Interop: 100% (30+ tests)
+- Se1Record: 100% (8 tests)
+- SwissEphemerisEngine: 100% (8 tests)
+- Se1BinaryReader: 100% (7 tests)
+- **TimeScale: 100% (4 tests)** 🎉 NEW
+- **DeltaT: 100% (12 tests)** 🎉 NEW
+- **TimeConversion: 100% (15 tests)** 🎉 NEW
+- Java Interop: 100% (40+ tests including time systems)
 
 ## Next Steps (TDD Roadmap)
 
@@ -251,12 +275,14 @@ Current test coverage (TDD):
 - [x] SE1 Record structure
 - [x] Chebyshev interpolation
 - [x] SwissEphemerisEngine core
-- [x] **Se1BinaryReader - Binary file reading** 🎉 NEW
-- [x] **EphemerisFileReader integration** 🎉 NEW
-- [x] **End-to-end calculation pipeline** 🎉 NEW
+- [x] Se1BinaryReader - Binary file reading
+- [x] EphemerisFileReader integration
+- [x] End-to-end calculation pipeline
+- [x] **Time Systems (ΔT, time scale conversions)** 🎉 NEW
+- [ ] Sidereal Time (GMST, GAST, LST) - Next
+- [ ] Complete coordinate transformations
 - [ ] File caching and management (optimization)
 - [ ] Complete planet support (all bodies)
-- [ ] Coordinate transformations
 
 ## Contributing
 

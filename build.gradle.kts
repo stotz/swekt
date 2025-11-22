@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "ch.typedef"
-version = "0.0.2"
+version = "0.0.7"
 
 repositories {
     mavenCentral()
