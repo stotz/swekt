@@ -101,14 +101,14 @@ object DeltaT {
 
     /**
      * Historic era (1600-1972): Use polynomial approximations
-     * Based on Morrison & Stephenson and NASA algorithms
+     * Based on Morrison & Stephenson and Espenak & Meeus (NASA)
      */
     private fun calculateHistoric(year: Double): Double {
         return when {
             // 1955-1972: Polynomial from Astronomical Almanac
             year >= 1955.0 -> {
                 val t = year - 1955.0
-                31.1 + 0.2523 * t + 0.0585 * t * t + 0.00157 * t * t * t
+                31.1 + 0.2523 * t - 0.0680 * t * t + 0.000115 * t * t * t
             }
             
             // 1900-1955: Polynomial from Astronomical Almanac
@@ -207,14 +207,29 @@ object DeltaT {
         val julianDay = JulianDay(jd)
         val greg = julianDay.toGregorian()
         
-        // Calculate day of year
-        val dayOfYear = greg.day + (greg.hour / 24.0)
+        // Calculate day of year properly
+        val daysInMonth = intArrayOf(0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+        
+        // Adjust for leap year
+        if (JulianDay.isLeapYear(greg.year)) {
+            daysInMonth[2] = 29
+        }
+        
+        // Sum days in previous months
+        var dayOfYear = 0
+        for (m in 1 until greg.month) {
+            dayOfYear += daysInMonth[m]
+        }
+        
+        // Add current day and fractional hour
+        dayOfYear += greg.day
+        val fractionOfDay = greg.hour / 24.0
         
         // Days in year (365 or 366 for leap year)
         val daysInYear = if (JulianDay.isLeapYear(greg.year)) 366.0 else 365.0
         
         // Return decimal year
-        return greg.year.toDouble() + (greg.month - 1) * 30.5 / daysInYear + dayOfYear / daysInYear
+        return greg.year.toDouble() + (dayOfYear - 1 + fractionOfDay) / daysInYear
     }
 
     /**

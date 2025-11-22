@@ -124,7 +124,8 @@ data class JulianDay(val value: Double) : Comparable<JulianDay> {
             return JulianDay(jd)
         }
 
-        private fun isLeapYear(year: Int): Boolean {
+        @JvmStatic
+        fun isLeapYear(year: Int): Boolean {
             return when {
                 year % 400 == 0 -> true
                 year % 100 == 0 -> false
