@@ -28,8 +28,8 @@ enum class Planet(
     URANUS(7, "Uranus", isModern = true),
     NEPTUNE(8, "Neptune", isModern = true),
     PLUTO(9, "Pluto", isModern = true),
-    MEAN_NODE(10, "Mean Node", isNode = true),
-    TRUE_NODE(11, "True Node", isNode = true);
+    MEAN_NODE(10, "mean Node", isNode = true),
+    TRUE_NODE(11, "true Node", isNode = true);
 
     companion object {
         /**
@@ -56,6 +56,14 @@ enum class Planet(
         @JvmStatic
         fun classicalPlanets(): List<Planet> = listOf(
             SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN
+        )
+
+        /**
+         * Returns modern planets only (requires telescope).
+         */
+        @JvmStatic
+        fun modernPlanets(): List<Planet> = listOf(
+            URANUS, NEPTUNE, PLUTO
         )
     }
 }

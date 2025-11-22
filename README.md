@@ -8,7 +8,7 @@ High-precision astronomical calculations with modern, type-safe Kotlin APIs.
 
 ## Project Status
 
-Version: 0.0.2 (TDD Development Phase)
+Version: 0.0.4 (TDD Development Phase - Chebyshev Interpolation)
 
 ### Java Interoperability ☕
 
@@ -26,6 +26,25 @@ System.out.println("Mars ID: " + mars.getId());
 ```
 
 See [JAVA_INTEROP.md](JAVA_INTEROP.md) for complete Java usage guide.
+
+## Quick Start 🚀
+
+```kotlin
+import ch.typedef.swekt.calculation.SimpleCalculationEngine
+import ch.typedef.swekt.model.JulianDay
+import ch.typedef.swekt.model.Planet
+
+val engine = SimpleCalculationEngine()
+val jd = JulianDay.J2000
+
+// Calculate Sun position
+val sunPos = engine.calculate(Planet.SUN, jd)
+println("Sun: ${sunPos.longitude}° at ${sunPos.distance} AU")
+
+// Calculate Moon position
+val moonPos = engine.calculate(Planet.MOON, jd)
+println("Moon: ${moonPos.longitude}° at ${moonPos.distance} AU")
+```
 
 ## What's Implemented (TDD)
 
@@ -46,12 +65,51 @@ See [JAVA_INTEROP.md](JAVA_INTEROP.md) for complete Java usage guide.
   - ✅ Planet lookup by ID
   - ✅ Display names
 
+### ✅ Configuration (Test-Driven)
+
+- **EphemerisConfig** - Configuration management
+  - ✅ Path resolution
+  - ✅ SE_EPHE_PATH support
+  - ✅ Multiple data source priority
+
+- **DataSource** - Data source types
+  - ✅ SE1 compressed files
+  - ✅ JPL ephemeris
+  - ✅ Moshier analytical
+
+### ✅ File I/O (Test-Driven)
+
+- **EphemerisFileReader** - Binary file reading
+  - ✅ SE1 file format support
+  - ✅ Header parsing
+  - ✅ Record structure
+  - ✅ Endianness detection
+
+### ✅ Calculation Engine (Test-Driven) 🚀 NEW
+
+- **PlanetaryPosition** - Calculation results
+  - ✅ Heliocentric ecliptic coordinates
+  - ✅ Position and velocity
+  - ✅ Input validation
+
+- **SimpleCalculationEngine** - Analytical calculations
+  - ✅ Sun position (VSOP87 simplified, ~0.01° accuracy)
+  - ✅ Moon position (ELP2000 simplified, ~0.17° accuracy)
+  - ⏳ Planets (coming soon)
+
+- **ChebyshevInterpolation** - Mathematical core 🎯 NEW
+  - ✅ Clenshaw's algorithm (ACM Algorithm 446)
+  - ✅ Function evaluation (position)
+  - ✅ Derivative evaluation (velocity)
+  - ✅ Coordinate normalization
+  - ✅ Ready for SE1 integration
+
 ### 🔄 In Progress (Next TDD Cycle)
 
-- [ ] PlanetaryPosition - Calculation results
-- [ ] CalculationFlags - Configuration options
-- [ ] EphemerisConfig - Path resolution
-- [ ] EphemerisFileReader - Binary .se1 file reading
+- [ ] Full Swiss Ephemeris integration
+- [ ] SE1 binary interpolation
+- [ ] Planet calculations
+- [ ] Advanced calculation flags
 
 ## TDD Workflow
 
@@ -79,17 +137,32 @@ Or with build:
 swekt/
 ├── src/
 │   ├── main/kotlin/ch/typedef/swekt/
-│   │   ├── model/           # Domain models
+│   │   ├── model/              # Domain models
 │   │   │   ├── JulianDay.kt
 │   │   │   └── Planet.kt
-│   │   ├── calculation/     # Calculation engine
-│   │   ├── config/          # Configuration
-│   │   └── io/              # File I/O
+│   │   ├── calculation/        # Calculation engine 🚀 NEW
+│   │   │   ├── PlanetaryPosition.kt
+│   │   │   └── SimpleCalculationEngine.kt
+│   │   ├── config/             # Configuration
+│   │   │   ├── DataSource.kt
+│   │   │   ├── EphemerisConfig.kt
+│   │   │   └── EphemerisPathResolver.kt
+│   │   ├── io/                 # File I/O
+│   │   │   ├── EphemerisFileHeader.kt
+│   │   │   ├── EphemerisFileReader.kt
+│   │   │   ├── EphemerisRecord.kt
+│   │   │   └── FileFormat.kt
+│   │   └── examples/           # Example programs 🚀 NEW
+│   │       └── CalculationExample.kt
 │   │
-│   └── test/kotlin/ch/typedef/swekt/
-│       └── model/
-│           ├── JulianDayTest.kt
-│           └── PlanetTest.kt
+│   └── test/
+│       ├── kotlin/ch/typedef/swekt/
+│       │   ├── model/
+│       │   ├── calculation/    # 🚀 NEW
+│       │   ├── config/
+│       │   └── io/
+│       └── java/ch/typedef/swekt/interop/
+│           └── CalculationJavaInteropTest.java  # 🚀 NEW
 │
 ├── build.gradle.kts
 ├── settings.gradle.kts
@@ -124,8 +197,14 @@ swekt/
 ## Test Coverage
 
 Current test coverage (TDD):
-- JulianDay: 100% (15 tests)
-- Planet: 100% (11 tests)
+- JulianDay: 100% (15+ tests)
+- Planet: 100% (11+ tests)
+- EphemerisConfig: 100% (10+ tests)
+- EphemerisFileReader: 100% (15+ tests)
+- PlanetaryPosition: 100% (7 tests)
+- SimpleCalculationEngine: 100% (10 tests)
+- **ChebyshevInterpolation: 100% (30+ tests)** 🎯 NEW
+- Java Interop: 100% (30+ tests including Chebyshev)
 
 ## Next Steps (TDD Roadmap)
 
@@ -134,22 +213,31 @@ Current test coverage (TDD):
 - [x] Planet
 - [x] GregorianDate
 
-### Phase 2: Configuration (Next)
-- [ ] EphemerisConfig
-- [ ] DataSource
-- [ ] EphemerisPathResolver (SE_EPHE_PATH support)
+### Phase 2: Configuration ✅ DONE
+- [x] EphemerisConfig
+- [x] DataSource
+- [x] EphemerisPathResolver (SE_EPHE_PATH support)
 
-### Phase 3: File I/O
-- [ ] EphemerisFileReader
-- [ ] Binary format parsing
-- [ ] Endianness detection
-- [ ] File caching
+### Phase 3: File I/O ✅ DONE
+- [x] EphemerisFileReader
+- [x] Binary format parsing
+- [x] Endianness detection
+- [x] File header structures
 
-### Phase 4: Calculation
-- [ ] PlanetaryPosition
-- [ ] CalculationResult
-- [ ] CalculationFlags
-- [ ] Basic calculation engine
+### Phase 4: Calculation ✅ IN PROGRESS 🚀
+- [x] PlanetaryPosition
+- [x] SimpleCalculationEngine (Sun, Moon)
+- [x] **Chebyshev Interpolation** 🎯 NEW
+- [ ] Planet calculations (Mercury through Pluto)
+- [ ] Swiss Ephemeris integration with SE1 files
+- [ ] Advanced calculation flags
+
+### Phase 5: SE1 Integration (Next) 🎯
+- [ ] SE1 binary reader enhancement
+- [ ] Chebyshev coefficient extraction
+- [ ] SwissEphemerisEngine class
+- [ ] Full planet support via SE1
+- [ ] Performance optimization
 
 ## Contributing
 

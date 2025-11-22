@@ -22,14 +22,16 @@ data class JulianDay(val value: Double) : Comparable<JulianDay> {
 
     /**
      * Converts this Julian Day to Gregorian calendar date.
+     * Uses proleptic Gregorian calendar (Gregorian rules extended to all dates).
      */
     fun toGregorian(): GregorianDate {
         val jd = value + 0.5
         val z = floor(jd).toInt()
         val f = jd - z
         
+        // Always apply Gregorian correction (no Julian calendar cutoff)
         val alpha = floor((z - 1867216.25) / 36524.25).toInt()
-        val a = if (z < 2299161) z else z + 1 + alpha - floor(alpha / 4.0).toInt()
+        val a = z + 1 + alpha - floor(alpha / 4.0).toInt()
         
         val b = a + 1524
         val c = floor((b - 122.1) / 365.25).toInt()
@@ -51,6 +53,24 @@ data class JulianDay(val value: Double) : Comparable<JulianDay> {
          */
         @JvmField
         val J2000 = JulianDay(2451545.0)
+
+        /**
+         * J1900.0 epoch = 1899-12-31 12:00:00 UT
+         */
+        @JvmField
+        val J1900 = JulianDay(2415020.0)
+
+        /**
+         * Java getter for J2000
+         */
+        @JvmStatic
+        fun getJ2000(): JulianDay = J2000
+
+        /**
+         * Java getter for J1900
+         */
+        @JvmStatic
+        fun getJ1900(): JulianDay = J1900
 
         /**
          * Creates a Julian Day from Gregorian calendar date.
@@ -92,13 +112,9 @@ data class JulianDay(val value: Double) : Comparable<JulianDay> {
                 m += 12
             }
             
+            // Always use proleptic Gregorian calendar (no Julian calendar cutoff)
             val a = floor(y / 100.0).toInt()
-            val b = if (year > 1582 || (year == 1582 && month > 10) || 
-                       (year == 1582 && month == 10 && day >= 15)) {
-                2 - a + floor(a / 4.0).toInt()
-            } else {
-                0
-            }
+            val b = 2 - a + floor(a / 4.0).toInt()
             
             val jd = floor(365.25 * (y + 4716)) +
                     floor(30.6001 * (m + 1)) +

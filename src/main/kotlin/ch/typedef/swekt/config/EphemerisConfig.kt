@@ -58,6 +58,18 @@ data class EphemerisConfig private constructor(
         }
         
         /**
+         * Creates configuration from SE_EPHE_PATH environment variable.
+         * Reads the variable from System.getenv().
+         *
+         * @return Configuration with paths from environment variable
+         */
+        @JvmStatic
+        fun fromEnvironment(): EphemerisConfig {
+            val envPath = System.getenv("SE_EPHE_PATH") ?: ""
+            return fromEnvironment(envPath)
+        }
+        
+        /**
          * Creates a builder for custom configuration.
          */
         @JvmStatic

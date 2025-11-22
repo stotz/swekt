@@ -49,7 +49,7 @@ class PlanetTest {
     fun `should have display names`() {
         assertThat(Planet.SUN.displayName).isEqualTo("Sun")
         assertThat(Planet.MARS.displayName).isEqualTo("Mars")
-        assertThat(Planet.MEAN_NODE.displayName).isEqualTo("Mean Node")
+        assertThat(Planet.MEAN_NODE.displayName).isEqualTo("mean Node")
     }
 
     @Test
