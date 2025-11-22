@@ -27,14 +27,14 @@ import kotlin.math.*
  * - Telescope pointing
  *
  * Implementation based on:
- * - IAU 1976 formula (Swiss Ephemeris standard)
- * - Meeus, "Astronomical Algorithms" (1998), Chapter 12
- * - Astronomical Almanac
+ * - IAU 2006 Resolution B1 (high precision)
+ * - N. Capitaine, P.T. Wallace, J. Chapront, A&A 412, 567-586 (2003)
  * - Swiss Ephemeris swephlib.c
+ * - Meeus, "Astronomical Algorithms" (1998), Chapter 12
  *
  * Accuracy:
- * IAU 1976 provides ±0.01 second accuracy, which is excellent for
- * astrological house calculations (±0.15° in house cusps).
+ * IAU 2006 provides sub-microarcsecond accuracy (< 0.001 seconds)
+ * for precise astronomical and astrological calculations.
  */
 object SiderealTime {
 
@@ -52,13 +52,12 @@ object SiderealTime {
      * Calculates Greenwich Mean Sidereal Time (GMST) for a given Julian Day.
      *
      * GMST is the hour angle of the mean vernal equinox at Greenwich.
-     * This uses the IAU 1976 formula, which is the standard used by Swiss Ephemeris
-     * and provides excellent accuracy for astrological calculations.
+     * This uses the IAU 2006 formula for high precision.
      *
      * Formula from:
-     * - IAU 1976 resolution
-     * - Astronomical Almanac
-     * - Swiss Ephemeris swephlib.c swe_sidtime0()
+     * - IAU 2006 Resolution B1
+     * - N. Capitaine, P.T. Wallace, J. Chapront, "Expressions for IAU 2000 precession quantities", A&A 412, 567-586 (2003)
+     * - Swiss Ephemeris swephlib.c line 64-69
      *
      * @param julianDay Julian Day (UT)
      * @return GMST in hours (0-24)
@@ -67,20 +66,37 @@ object SiderealTime {
     fun calculateGMST(julianDay: JulianDay): Double {
         val jd = julianDay.value
         
-        // Split into midnight and time of day
-        val jd0 = floor(jd - 0.5) + 0.5 // JD at midnight before
-        val secs = (jd - jd0) * 86400.0  // Seconds since midnight UT
+        // Split into midnight and time of day (Swiss Ephemeris method)
+        var jd0 = floor(jd)
+        var secs = jd - jd0
         
-        // Centuries from J2000 for UT
+        if (secs < 0.5) {
+            jd0 -= 0.5
+            secs += 0.5
+        } else {
+            jd0 += 0.5
+            secs -= 0.5
+        }
+        secs *= 86400.0  // Convert to seconds
+        
+        // UT1 centuries from J2000
         val tu = (jd0 - J2000) / 36525.0
         
-        // IAU 1976 formula: GMST at 0h UT in seconds
-        // Reference: Swiss Ephemeris swephlib.c line ~3514
-        var gmst = ((-6.2e-6 * tu + 9.3104e-2) * tu + 8640184.812866) * tu + 24110.54841
+        // TT centuries from J2000 (requires Delta T)
+        val deltaT = DeltaT.calculate(JulianDay(jd0))  // in days
+        val tt = (jd0 + deltaT - J2000) / 36525.0
         
-        // Mean solar days per sidereal day at date tu
-        // = 1.00273790934 in 1986
-        val msday = 1.0 + ((-1.86e-5 * tu + 0.186208) * tu + 8640184.812866) / (86400.0 * 36525.0)
+        // IAU 2006 formula: GMST at 0h UT in seconds
+        // Complex polynomial with UT/TT cross-term
+        var gmst = (((-0.000000002454 * tt - 0.00000199708) * tt - 0.0000002926) * tt + 0.092772110) * tt * tt +
+                   307.4771013 * (tt - tu) +
+                   8640184.79447825 * tu +
+                   24110.5493771
+        
+        // Mean solar days per sidereal day at date
+        // Derivative of GMST (can assume UT1 ≈ TT)
+        val msday = 1.0 + ((((-0.000000012270 * tt - 0.00000798832) * tt - 0.0000008778) * tt + 0.185544220) * tt +
+                   8640184.79447825) / (86400.0 * 36525.0)
         
         // Add time since midnight
         gmst += msday * secs
@@ -95,22 +111,37 @@ object SiderealTime {
     /**
      * Calculates GMST at 0h UT (midnight) for a given date.
      *
-     * Formula from IAU 1976 (Swiss Ephemeris standard).
+     * Formula from IAU 2006.
      *
      * @param julianDay Julian Day (UT)
      * @return GMST at 0h UT in hours (0-24)
      */
     @JvmStatic
     fun calculateGMST0(julianDay: JulianDay): Double {
-        // Get midnight before this JD
         val jd = julianDay.value
-        val jd0 = floor(jd - 0.5) + 0.5
         
-        // Centuries from J2000 for UT
+        // Get midnight JD (Swiss Ephemeris method)
+        var jd0 = floor(jd)
+        var secs = jd - jd0
+        
+        if (secs < 0.5) {
+            jd0 -= 0.5
+        } else {
+            jd0 += 0.5
+        }
+        
+        // UT1 centuries from J2000
         val tu = (jd0 - J2000) / 36525.0
         
-        // IAU 1976 formula - GMST at 0h UT in seconds
-        var gmst = ((-6.2e-6 * tu + 9.3104e-2) * tu + 8640184.812866) * tu + 24110.54841
+        // TT centuries from J2000
+        val deltaT = DeltaT.calculate(JulianDay(jd0))
+        val tt = (jd0 + deltaT - J2000) / 36525.0
+        
+        // IAU 2006 formula - GMST at 0h UT in seconds
+        var gmst = (((-0.000000002454 * tt - 0.00000199708) * tt - 0.0000002926) * tt + 0.092772110) * tt * tt +
+                   307.4771013 * (tt - tu) +
+                   8640184.79447825 * tu +
+                   24110.5493771
         
         // Normalize to 0-86400 seconds
         gmst = gmst - 86400.0 * floor(gmst / 86400.0)

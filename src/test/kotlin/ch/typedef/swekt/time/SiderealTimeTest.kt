@@ -151,11 +151,12 @@ class SiderealTimeTest {
         val gmst2 = SiderealTime.calculateGMST(jd2)
         
         // Sidereal day is ~3m 56s shorter than solar day
-        // So GMST should increase by ~24h 3m 56s ≈ 24.066 hours per solar day
+        // So GMST increases by ~24h 3m 56s ≈ 24.066 hours per solar day
+        // After normalization to 0-24h, this appears as ~0.066 hours
         var diff = gmst2 - gmst1
         if (diff < 0) diff += 24.0
         
-        assertThat(diff).isCloseTo(24.066, org.assertj.core.data.Offset.offset(0.01))
+        assertThat(diff).isCloseTo(0.066, org.assertj.core.data.Offset.offset(0.01))
     }
 
     @Test
@@ -198,11 +199,12 @@ class SiderealTimeTest {
         val gmst1 = SiderealTime.calculateGMST(jd1)
         val gmst2 = SiderealTime.calculateGMST(jd2)
         
-        // Difference should be approximately 2.4 hours (0.1 days = 2.4 hours)
+        // Difference should be approximately 2.4 hours (0.1 days = 2.4 hours solar)
         var diff = gmst2 - gmst1
         if (diff < 0) diff += 24.0
         
-        // 0.1 solar days ≈ 0.1007 sidereal days ≈ 2.417 hours
-        assertThat(diff).isCloseTo(2.417, org.assertj.core.data.Offset.offset(0.01))
+        // 0.1 solar days ≈ 0.1002738 sidereal days ≈ 2.4066 sidereal hours
+        // (1 solar day = 1.002737909 sidereal days)
+        assertThat(diff).isCloseTo(2.4066, org.assertj.core.data.Offset.offset(0.01))
     }
 }

@@ -95,7 +95,8 @@ public class SiderealTimeJavaInteropTest {
         double diff = gmst2 - gmst1;
         if (diff < 0) diff += 24.0;
         
-        // Should increase by ~24.066 hours per solar day
-        assertThat(diff).isCloseTo(24.066, within(0.01));
+        // GMST increases by ~24.066 hours per solar day, but after
+        // normalization to 0-24h, this appears as ~0.066 hours
+        assertThat(diff).isCloseTo(0.066, within(0.01));
     }
 }

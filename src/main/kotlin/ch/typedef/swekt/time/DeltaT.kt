@@ -100,37 +100,70 @@ object DeltaT {
     }
 
     /**
-     * Historic era (1600-1972): Use polynomial approximations
-     * Based on Morrison & Stephenson and Espenak & Meeus (NASA)
+     * Historic era (1600-2005): Use polynomial approximations
+     * Based on Espenak & Meeus, NASA (2006)
+     * Reference: https://eclipse.gsfc.nasa.gov/SEcat5/deltatpoly.html
      */
     private fun calculateHistoric(year: Double): Double {
         return when {
-            // 1955-1972: Polynomial from Astronomical Almanac
-            year >= 1955.0 -> {
-                val t = year - 1955.0
-                31.1 + 0.2523 * t - 0.0680 * t * t + 0.000115 * t * t * t
+            // 2005-present: Modern measured values
+            year >= 2005.0 -> {
+                val leapSeconds = getLeapSeconds(yearToJd(year))
+                leapSeconds + 32.184
             }
             
-            // 1900-1955: Polynomial from Astronomical Almanac
+            // 1986-2005: Polynomial from NASA
+            year >= 1986.0 -> {
+                val t = year - 2000.0
+                63.86 + 0.3345 * t - 0.060374 * t * t + 0.0017275 * t * t * t + 
+                        0.000651814 * t.pow(4.0) + 0.00002373599 * t.pow(5.0)
+            }
+            
+            // 1961-1986: Polynomial from NASA
+            year >= 1961.0 -> {
+                val t = year - 1975.0
+                45.45 + 1.067 * t - t * t / 260.0 - t * t * t / 718.0
+            }
+            
+            // 1941-1961: Polynomial from NASA
+            year >= 1941.0 -> {
+                val t = year - 1950.0
+                29.07 + 0.407 * t - t * t / 233.0 + t * t * t / 2547.0
+            }
+            
+            // 1920-1941: Polynomial from NASA
+            year >= 1920.0 -> {
+                val t = year - 1920.0
+                21.20 + 0.84493 * t - 0.076100 * t * t + 0.0020936 * t * t * t
+            }
+            
+            // 1900-1920: Polynomial from NASA
             year >= 1900.0 -> {
                 val t = year - 1900.0
                 -2.79 + 1.494119 * t - 0.0598939 * t * t + 0.0061966 * t * t * t - 0.000197 * t * t * t * t
             }
             
-            // 1800-1900: Polynomial from Astronomical Almanac
+            // 1860-1900: Polynomial from NASA
+            year >= 1860.0 -> {
+                val t = year - 1860.0
+                7.62 + 0.5737 * t - 0.251754 * t * t + 0.01680668 * t * t * t - 
+                        0.0004473624 * t.pow(4.0) + t.pow(5.0) / 233174.0
+            }
+            
+            // 1800-1860: Polynomial from NASA
             year >= 1800.0 -> {
                 val t = year - 1800.0
-                13.72 - 0.332447 * t + 0.0068612 * t * t + 0.0041116 * t * t * t - 0.00037436 * t * t * t * t +
+                13.72 - 0.332447 * t + 0.0068612 * t * t + 0.0041116 * t * t * t - 0.00037436 * t.pow(4.0) +
                         0.0000121272 * t.pow(5.0) - 0.0000001699 * t.pow(6.0) + 0.000000000875 * t.pow(7.0)
             }
             
-            // 1700-1800: Polynomial from Morrison & Stephenson (2004)
+            // 1700-1800: Polynomial from NASA
             year >= 1700.0 -> {
                 val t = year - 1700.0
                 8.83 + 0.1603 * t - 0.0059285 * t * t + 0.00013336 * t * t * t - t.pow(4.0) / 1174000.0
             }
             
-            // 1600-1700: Polynomial from Morrison & Stephenson (2004)
+            // 1600-1700: Polynomial from NASA
             else -> {
                 val t = year - 1600.0
                 120.0 - 0.9808 * t - 0.01532 * t * t + t.pow(3.0) / 7129.0
