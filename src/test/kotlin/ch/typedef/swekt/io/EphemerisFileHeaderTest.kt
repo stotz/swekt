@@ -1,0 +1,182 @@
+package ch.typedef.swekt.io
+
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.Files
+import java.nio.file.Path
+
+/**
+ * TDD Tests for EphemerisFileHeader
+ */
+class EphemerisFileHeaderTest {
+
+    @Test
+    fun `should read SE1 file magic number`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.magic).isEqualTo("SEPL")
+    }
+
+    @Test
+    fun `should detect SE1 file format`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.fileFormat).isEqualTo(FileFormat.SE1)
+    }
+
+    @Test
+    fun `should read file version`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.version).isNotNull
+        assertThat(header.version).isGreaterThan(0)
+    }
+
+    @Test
+    fun `should read time range from header`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.startJD).isNotNull
+        assertThat(header.endJD).isNotNull
+        assertThat(header.endJD).isGreaterThan(header.startJD)
+    }
+
+    @Test
+    fun `should detect little endian byte order`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir, ByteOrder.LITTLE_ENDIAN)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.byteOrder).isEqualTo(ByteOrder.LITTLE_ENDIAN)
+    }
+
+    @Test
+    fun `should detect big endian byte order`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir, ByteOrder.BIG_ENDIAN)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.byteOrder).isEqualTo(ByteOrder.BIG_ENDIAN)
+    }
+
+    @Test
+    fun `should read number of constants`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.numConstants).isGreaterThanOrEqualTo(0)
+    }
+
+    @Test
+    fun `should read astronomical unit`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        // AU should be around 149597870.7 km
+        assertThat(header.astronomicalUnit).isBetween(1.49e8, 1.50e8)
+    }
+
+    @Test
+    fun `should read Earth-Moon mass ratio`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        // EMB ratio should be around 81.3
+        assertThat(header.earthMoonRatio).isBetween(80.0, 82.0)
+    }
+
+    @Test
+    fun `should validate file signature`(@TempDir tempDir: Path) {
+        val invalidFile = tempDir.resolve("invalid.se1")
+        Files.write(invalidFile, "INVALID_DATA".toByteArray())
+        
+        val result = runCatching { 
+            EphemerisFileHeader.read(invalidFile) 
+        }
+        
+        assertThat(result.isFailure).isTrue()
+    }
+
+    @Test
+    fun `should handle corrupted file gracefully`(@TempDir tempDir: Path) {
+        val corruptedFile = tempDir.resolve("corrupt.se1")
+        Files.write(corruptedFile, ByteArray(10) { 0 }) // Too small
+        
+        val result = runCatching { 
+            EphemerisFileHeader.read(corruptedFile) 
+        }
+        
+        assertThat(result.isFailure).isTrue()
+    }
+
+    @Test
+    fun `should read header size`(@TempDir tempDir: Path) {
+        val testFile = createTestSE1File(tempDir)
+        
+        val header = EphemerisFileHeader.read(testFile)
+        
+        assertThat(header.headerSize).isGreaterThan(0)
+        assertThat(header.headerSize).isLessThan(10000) // Reasonable limit
+    }
+
+    /**
+     * Creates a minimal valid SE1 test file.
+     * 
+     * This is a simplified header for testing purposes.
+     * Real SE1 files have more complex structure.
+     */
+    private fun createTestSE1File(
+        tempDir: Path, 
+        byteOrder: ByteOrder = ByteOrder.LITTLE_ENDIAN
+    ): Path {
+        val testFile = tempDir.resolve("test.se1")
+        
+        val buffer = ByteBuffer.allocate(1024).order(byteOrder)
+        
+        // Magic number "SEPL"
+        buffer.put("SEPL".toByteArray())
+        
+        // Version (e.g., 2.10)
+        buffer.putInt(210)
+        
+        // Start JD (e.g., 2451545.0 = J2000.0)
+        buffer.putDouble(2451545.0)
+        
+        // End JD (e.g., 100 years later)
+        buffer.putDouble(2488069.0)
+        
+        // Number of constants
+        buffer.putInt(400)
+        
+        // Astronomical Unit (km)
+        buffer.putDouble(149597870.7)
+        
+        // Earth-Moon mass ratio
+        buffer.putDouble(81.30056907419062)
+        
+        // Header size
+        buffer.putInt(256)
+        
+        // Fill rest with zeros
+        while (buffer.hasRemaining()) {
+            buffer.put(0)
+        }
+        
+        Files.write(testFile, buffer.array())
+        return testFile
+    }
+}
