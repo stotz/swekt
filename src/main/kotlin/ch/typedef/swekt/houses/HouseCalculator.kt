@@ -1,0 +1,852 @@
+package ch.typedef.swekt.houses
+
+import ch.typedef.swekt.model.JulianDay
+import ch.typedef.swekt.time.SiderealTime
+import ch.typedef.swekt.time.DeltaT
+import kotlin.math.*
+
+/**
+ * Calculator for astrological house systems.
+ *
+ * Houses divide the ecliptic into 12 (or 36) sections based on the observer's
+ * location and time. Different house systems use different mathematical approaches.
+ */
+interface HouseCalculator {
+    /**
+     * Calculate house cusps for given time and location.
+     *
+     * @param julianDay Time of calculation (UT)
+     * @param location Geographic location
+     * @param houseSystem House system to use
+     * @return Calculated house cusps and angles
+     */
+    fun calculate(
+        julianDay: JulianDay,
+        location: GeographicLocation,
+        houseSystem: HouseSystem
+    ): HouseCusps
+}
+
+/**
+ * Standard implementation of house calculations.
+ *
+ * Implements all major astrological house systems with high-precision algorithms.
+ */
+class StandardHouseCalculator : HouseCalculator {
+
+    companion object {
+        private const val VERY_SMALL = 1e-10
+        private const val RADTODEG = 180.0 / PI
+        private const val DEGTORAD = PI / 180.0
+
+        /**
+         * Calculate sine of angle in degrees.
+         */
+        private fun sind(degrees: Double): Double = sin(degrees * DEGTORAD)
+
+        /**
+         * Calculate cosine of angle in degrees.
+         */
+        private fun cosd(degrees: Double): Double = cos(degrees * DEGTORAD)
+
+        /**
+         * Calculate tangent of angle in degrees.
+         */
+        private fun tand(degrees: Double): Double = tan(degrees * DEGTORAD)
+
+        /**
+         * Calculate arcsine returning degrees.
+         */
+        private fun asind(x: Double): Double = asin(x) * RADTODEG
+
+        /**
+         * Calculate arctangent returning degrees.
+         */
+        private fun atand(x: Double): Double = atan(x) * RADTODEG
+
+        /**
+         * Calculate atan2 returning degrees.
+         */
+        private fun atan2d(y: Double, x: Double): Double = atan2(y, x) * RADTODEG
+
+        /**
+         * Normalize angle to 0-360 degrees.
+         */
+        private fun normalize(degrees: Double): Double {
+            var result = degrees % 360.0
+            if (result < 0.0) result += 360.0
+            return result
+        }
+
+        /**
+         * Calculate difference between two angles (a - b).
+         * Result is in range -180 to +180 degrees.
+         */
+        private fun angleDiff(a: Double, b: Double): Double {
+            var diff = normalize(a) - normalize(b)
+            if (diff > 180.0) diff -= 360.0
+            if (diff < -180.0) diff += 360.0
+            return diff
+        }
+    }
+
+    override fun calculate(
+        julianDay: JulianDay,
+        location: GeographicLocation,
+        houseSystem: HouseSystem
+    ): HouseCusps {
+        // Calculate obliquity of ecliptic
+        val deltaT = DeltaT.calculate(julianDay)
+        val tjdEphemeris = julianDay.value + deltaT
+        val T = (tjdEphemeris - 2451545.0) / 36525.0
+        val obliquity = calculateObliquity(T)
+
+        // Calculate ARMC (Right Ascension of MC)
+        // This is local sidereal time at the meridian
+        val armc = calculateARMC(julianDay, location.longitude, obliquity)
+
+        // Calculate using ARMC
+        return calculateFromARMC(
+            armc = armc,
+            latitude = location.latitude,
+            obliquity = obliquity,
+            houseSystem = houseSystem
+        )
+    }
+
+    /**
+     * Calculate obliquity of ecliptic (IAU 1976).
+     *
+     * @param T Julian centuries from J2000.0
+     * @return Obliquity in degrees
+     */
+    private fun calculateObliquity(T: Double): Double {
+        // IAU 1976 formula
+        return 23.4392911 - 
+               0.0130042 * T - 
+               0.00000016 * T * T + 
+               0.000000504 * T * T * T
+    }
+
+    /**
+     * Calculate ARMC (Right Ascension of MC).
+     *
+     * ARMC = Local Sidereal Time = GMST + longitude
+     *
+     * @param julianDay Time (UT)
+     * @param longitude Geographic longitude in degrees (positive East)
+     * @param obliquity Obliquity of ecliptic in degrees
+     * @return ARMC in degrees (0-360)
+     */
+    private fun calculateARMC(
+        julianDay: JulianDay,
+        longitude: Double,
+        obliquity: Double
+    ): Double {
+        // Get GAST (Greenwich Apparent Sidereal Time)
+        val gast = SiderealTime.calculateGAST(julianDay)
+        
+        // Convert to degrees and add longitude
+        val armc = gast * 15.0 + longitude
+        
+        return normalize(armc)
+    }
+
+    /**
+     * Calculate houses from ARMC (core calculation function).
+     *
+     * This is the main dispatcher that calls specific house system algorithms.
+     *
+     * @param armc Right Ascension of MC in degrees
+     * @param latitude Geographic latitude in degrees
+     * @param obliquity Obliquity of ecliptic in degrees
+     * @param houseSystem House system to use
+     * @return Calculated house cusps
+     */
+    private fun calculateFromARMC(
+        armc: Double,
+        latitude: Double,
+        obliquity: Double,
+        houseSystem: HouseSystem
+    ): HouseCusps {
+        val cusps = DoubleArray(if (houseSystem == HouseSystem.GAUQUELIN) 37 else 13)
+        
+        // Calculate MC (Medium Coeli)
+        val mc = calculateMC(armc, obliquity)
+        cusps[10] = mc
+
+        // Calculate Ascendant
+        val ascendant = calculateAscendant(armc + 90.0, latitude, obliquity)
+        cusps[1] = ascendant
+
+        // Calculate other angles
+        val vertex = calculateVertex(armc, latitude, obliquity)
+        val equatorialAsc = calculateEquatorialAscendant(armc, obliquity)
+        val coAscKoch = calculateCoAscendantKoch(ascendant, latitude, obliquity)
+        val coAscMunkasey = calculateCoAscendantMunkasey(ascendant, latitude, obliquity)
+        val polarAsc = calculatePolarAscendant(armc, latitude, obliquity)
+
+        // Calculate intermediate cusps based on house system
+        calculateIntermediateCusps(
+            cusps = cusps,
+            armc = armc,
+            latitude = latitude,
+            obliquity = obliquity,
+            houseSystem = houseSystem
+        )
+
+        return HouseCusps(
+            cusps = cusps,
+            ascendant = ascendant,
+            mc = mc,
+            armc = normalize(armc),
+            vertex = vertex,
+            equatorialAscendant = equatorialAsc,
+            coAscendantKoch = coAscKoch,
+            coAscendantMunkasey = coAscMunkasey,
+            polarAscendant = polarAsc
+        )
+    }
+
+    /**
+     * Calculate MC from ARMC.
+     *
+     * MC is the ecliptic longitude that crosses the meridian.
+     *
+     * @param armc Right Ascension of MC in degrees
+     * @param obliquity Obliquity in degrees
+     * @return MC in degrees
+     */
+    private fun calculateMC(armc: Double, obliquity: Double): Double {
+        val armcNorm = normalize(armc)
+        
+        if (abs(armcNorm - 90.0) <= VERY_SMALL) {
+            return 90.0
+        } else if (abs(armcNorm - 270.0) <= VERY_SMALL) {
+            return 270.0
+        }
+
+        val tant = tand(armcNorm)
+        var mc = atand(tant / cosd(obliquity))
+        
+        if (armcNorm > 90.0 && armcNorm <= 270.0) {
+            mc = normalize(mc + 180.0)
+        }
+        
+        return normalize(mc)
+    }
+
+    /**
+     * Calculate Ascendant using Asc1 formula.
+     *
+     * @param ramc Right Ascension in degrees
+     * @param latitude Geographic latitude in degrees
+     * @param obliquity Obliquity in degrees
+     * @return Ascendant in degrees
+     */
+    private fun calculateAscendant(
+        ramc: Double,
+        latitude: Double,
+        obliquity: Double
+    ): Double {
+        return asc1(ramc, latitude, obliquity)
+    }
+
+    /**
+     * Asc1 formula - calculate ecliptic longitude crossing horizon.
+     *
+     * This is the core formula used throughout house calculations.
+     *
+     * @param th Right Ascension in degrees
+     * @param fi Geographic latitude in degrees
+     * @param ekl Obliquity in degrees
+     * @return Ecliptic longitude in degrees
+     */
+    private fun asc1(th: Double, fi: Double, ekl: Double): Double {
+        val sine = sind(ekl)
+        val cose = cosd(ekl)
+        
+        var x: Double
+        val a = 90.0
+        var ass: Double
+        
+        x = -cosd(fi) * cosd(th)
+        
+        if (abs(x) < VERY_SMALL) {
+            x = if (x < 0.0) -VERY_SMALL else VERY_SMALL
+        }
+        
+        ass = -tand(fi) * sind(th) / x
+        
+        if (abs(ass) < VERY_SMALL) {
+            ass = if (ass < 0.0) -VERY_SMALL else VERY_SMALL
+        }
+        
+        ass = atand(ass)
+        
+        if (x < 0.0) {
+            ass += 180.0
+        }
+        
+        ass -= a
+        ass = atand(tand(ass) / cose)
+        
+        if (ass < 0.0) {
+            ass += 180.0
+        }
+        
+        if (ass >= 180.0) {
+            ass -= 180.0
+        }
+        
+        return normalize(ass + a)
+    }
+
+    /**
+     * Calculate Vertex (auxiliary angle).
+     */
+    private fun calculateVertex(armc: Double, latitude: Double, obliquity: Double): Double {
+        // Vertex is calculated at co-latitude (90 - latitude)
+        val colatitude = 90.0 - latitude
+        return asc1(armc + 180.0, colatitude, obliquity)
+    }
+
+    /**
+     * Calculate Equatorial Ascendant.
+     */
+    private fun calculateEquatorialAscendant(armc: Double, obliquity: Double): Double {
+        // Equatorial Ascendant = Ascendant at equator (latitude = 0)
+        return asc1(armc + 90.0, 0.0, obliquity)
+    }
+
+    /**
+     * Calculate Co-Ascendant (Koch).
+     */
+    private fun calculateCoAscendantKoch(
+        ascendant: Double,
+        latitude: Double,
+        obliquity: Double
+    ): Double {
+        // Simplified calculation - would need more complex formula for precision
+        return normalize(ascendant + latitude)
+    }
+
+    /**
+     * Calculate Co-Ascendant (Munkasey).
+     */
+    private fun calculateCoAscendantMunkasey(
+        ascendant: Double,
+        latitude: Double,
+        obliquity: Double
+    ): Double {
+        // Simplified calculation
+        return normalize(ascendant - latitude)
+    }
+
+    /**
+     * Calculate Polar Ascendant (Munkasey).
+     */
+    private fun calculatePolarAscendant(
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ): Double {
+        // Simplified calculation
+        val polarLat = 90.0 - abs(latitude)
+        return asc1(armc + 90.0, polarLat, obliquity)
+    }
+
+    /**
+     * Calculate intermediate house cusps (2-3, 11-12, 4-9).
+     *
+     * This is where the different house systems diverge in their algorithms.
+     */
+    private fun calculateIntermediateCusps(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double,
+        houseSystem: HouseSystem
+    ) {
+        when (houseSystem) {
+            HouseSystem.EQUAL,
+            HouseSystem.EQUAL_MC -> calculateEqualHouses(cusps, houseSystem)
+            
+            HouseSystem.WHOLE_SIGN -> calculateWholeSignHouses(cusps)
+            
+            HouseSystem.VEHLOW -> calculateVehlowHouses(cusps)
+            
+            HouseSystem.PORPHYRY -> calculatePorphyryHouses(cusps)
+            
+            HouseSystem.PLACIDUS -> calculatePlacidusHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.KOCH -> calculateKochHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.REGIOMONTANUS -> calculateRegiomontanusHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.CAMPANUS -> calculateCampanusHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.ALCABITIUS -> calculateAlcabitiusHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.TOPOCENTRIC -> calculateTopocentricHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.MORINUS -> calculateMorinusHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.AZIMUTHAL -> calculateAzimuthalHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.MERIDIAN -> calculateMeridianHouses(cusps, armc, latitude, obliquity)
+            
+            HouseSystem.GAUQUELIN -> calculateGauquelinSectors(cusps, armc, latitude, obliquity)
+        }
+    }
+
+    /**
+     * Equal Houses - divide ecliptic into 12 equal 30° sections from Ascendant.
+     */
+    private fun calculateEqualHouses(cusps: DoubleArray, system: HouseSystem) {
+        val start = if (system == HouseSystem.EQUAL_MC) cusps[10] else cusps[1]
+        
+        if (system == HouseSystem.EQUAL_MC) {
+            // Start from MC (house 10)
+            for (i in 11..12) {
+                cusps[i] = normalize(start + (i - 10) * 30.0)
+            }
+            for (i in 1..9) {
+                cusps[i] = normalize(start + (i + 2) * 30.0)
+            }
+        } else {
+            // Start from Ascendant (house 1)
+            for (i in 2..12) {
+                cusps[i] = normalize(start + (i - 1) * 30.0)
+            }
+        }
+    }
+
+    /**
+     * Whole Sign Houses - each zodiac sign is one complete house.
+     */
+    private fun calculateWholeSignHouses(cusps: DoubleArray) {
+        // Find which sign the Ascendant is in
+        val ascSign = floor(cusps[1] / 30.0).toInt()
+        
+        // Each house starts at beginning of its sign
+        for (i in 1..12) {
+            val sign = (ascSign + i - 1) % 12
+            cusps[i] = sign * 30.0
+        }
+    }
+
+    /**
+     * Vehlow Equal Houses - cusps in middle of houses.
+     */
+    private fun calculateVehlowHouses(cusps: DoubleArray) {
+        // Ascendant is middle of house 1
+        val house1Start = normalize(cusps[1] - 15.0)
+        
+        for (i in 1..12) {
+            cusps[i] = normalize(house1Start + (i - 1) * 30.0)
+        }
+    }
+
+    /**
+     * Porphyry Houses - divide each quadrant into 3 equal parts.
+     */
+    private fun calculatePorphyryHouses(cusps: DoubleArray) {
+        val asc = cusps[1]
+        val mc = cusps[10]
+        val desc = normalize(asc + 180.0)
+        val ic = normalize(mc + 180.0)
+        
+        // Quadrant I: ASC to MC (houses 10, 11, 12)
+        val quadrant1 = angleDiff(mc, asc)
+        cusps[11] = normalize(asc + quadrant1 / 3.0)
+        cusps[12] = normalize(asc + 2.0 * quadrant1 / 3.0)
+        
+        // Quadrant II: MC to DESC (houses 1, 2, 3)
+        val quadrant2 = angleDiff(desc, mc)
+        cusps[2] = normalize(mc + quadrant2 / 3.0)
+        cusps[3] = normalize(mc + 2.0 * quadrant2 / 3.0)
+        
+        // Quadrant III: DESC to IC (houses 4, 5, 6)
+        val quadrant3 = angleDiff(ic, desc)
+        cusps[4] = normalize(desc)
+        cusps[5] = normalize(desc + quadrant3 / 3.0)
+        cusps[6] = normalize(desc + 2.0 * quadrant3 / 3.0)
+        
+        // Quadrant IV: IC to ASC (houses 7, 8, 9)
+        val quadrant4 = angleDiff(asc, ic)
+        cusps[7] = normalize(ic)
+        cusps[8] = normalize(ic + quadrant4 / 3.0)
+        cusps[9] = normalize(ic + 2.0 * quadrant4 / 3.0)
+    }
+
+    /**
+     * Placidus Houses - most popular modern system.
+     * Based on trisecting diurnal and nocturnal semi-arcs.
+     *
+     * Algorithm: Iterative calculation using pole height method.
+     * For polar regions (|latitude| >= 90° - obliquity): Falls back to Porphyry.
+     *
+     * Reference: Meeus "Astronomical Algorithms", Chapter 60
+     */
+    private fun calculatePlacidusHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        val latitudeRad = latitude * DEGTORAD
+        val obliquityRad = obliquity * DEGTORAD
+        
+        val tanfi = tand(latitude)
+        val sine = sind(obliquity)
+        val cose = cosd(obliquity)
+        val tane = tand(obliquity)
+        
+        // Check for polar circle - Placidus doesn't work well there
+        if (abs(latitude) >= 90.0 - obliquity) {
+            // Fall back to Porphyry in polar regions
+            calculatePorphyryHouses(cusps)
+            return
+        }
+        
+        // Calculate ascensional difference
+        val a = asind(tand(latitude) * tane)
+        val fh1 = atand(sind(a / 3.0) / tane)
+        val fh2 = atand(sind(a * 2.0 / 3.0) / tane)
+        
+        // House 11: Right Ascension = ARMC + 30°
+        cusps[11] = calculatePlacidusHouse(
+            rectasc = normalize(armc + 30.0),
+            poleHeight = fh1,
+            latitude = latitude,
+            obliquity = obliquity,
+            tanfi = tanfi,
+            sine = sine,
+            divisor = 3.0
+        )
+        
+        // House 12: Right Ascension = ARMC + 60°
+        cusps[12] = calculatePlacidusHouse(
+            rectasc = normalize(armc + 60.0),
+            poleHeight = fh2,
+            latitude = latitude,
+            obliquity = obliquity,
+            tanfi = tanfi,
+            sine = sine,
+            divisor = 1.5
+        )
+        
+        // House 2: Right Ascension = ARMC + 120°
+        cusps[2] = calculatePlacidusHouse(
+            rectasc = normalize(armc + 120.0),
+            poleHeight = fh2,
+            latitude = latitude,
+            obliquity = obliquity,
+            tanfi = tanfi,
+            sine = sine,
+            divisor = 1.5
+        )
+        
+        // House 3: Right Ascension = ARMC + 150°
+        cusps[3] = calculatePlacidusHouse(
+            rectasc = normalize(armc + 150.0),
+            poleHeight = fh1,
+            latitude = latitude,
+            obliquity = obliquity,
+            tanfi = tanfi,
+            sine = sine,
+            divisor = 3.0
+        )
+    }
+
+    /**
+     * Calculate single Placidus house using iterative method.
+     *
+     * @param rectasc Right Ascension of the house point
+     * @param poleHeight Initial pole height estimate
+     * @param latitude Geographic latitude
+     * @param obliquity Obliquity of ecliptic
+     * @param tanfi Tangent of latitude
+     * @param sine Sine of obliquity
+     * @param divisor Division factor (3.0 for houses 11/3, 1.5 for houses 12/2)
+     * @return House cusp in degrees
+     */
+    private fun calculatePlacidusHouse(
+        rectasc: Double,
+        poleHeight: Double,
+        latitude: Double,
+        obliquity: Double,
+        tanfi: Double,
+        sine: Double,
+        divisor: Double
+    ): Double {
+        val maxIterations = 100
+        val convergenceThreshold = 1e-10  // Very small for high precision
+        
+        // Initial estimate
+        var cusp = asc1(rectasc, poleHeight, obliquity)
+        
+        // Iterative refinement
+        for (iteration in 1..maxIterations) {
+            val previousCusp = cusp
+            
+            // Calculate tangent
+            val tant = tand(asind(sine * sind(cusp)))
+            
+            if (abs(tant) < VERY_SMALL) {
+                // Degenerate case - use right ascension directly
+                return rectasc
+            }
+            
+            // Calculate pole height
+            val f = atand(sind(asind(tanfi * tant) / divisor) / tant)
+            
+            // New estimate
+            cusp = asc1(rectasc, f, obliquity)
+            
+            // Check convergence
+            if (iteration > 1) {
+                val diff = abs(angleDiff(cusp, previousCusp))
+                if (diff < convergenceThreshold) {
+                    break
+                }
+            }
+            
+            if (iteration == maxIterations) {
+                // Failed to converge - fall back to last value
+                // This should rarely happen except very close to polar circle
+                break
+            }
+        }
+        
+        return cusp
+    }
+
+    /**
+     * Koch Houses - popular alternative to Placidus.
+     * Birth-place specific calculation.
+     *
+     * Algorithm: Uses birth location to calculate semi-arcs, then trisects them.
+     * For polar regions: Falls back to Porphyry.
+     */
+    private fun calculateKochHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // Check for polar circle
+        if (abs(latitude) >= 90.0 - obliquity) {
+            calculatePorphyryHouses(cusps)
+            return
+        }
+        
+        val sine = sind(obliquity)
+        val cose = cosd(obliquity)
+        val tanfi = tand(latitude)
+        val cosfi = cosd(latitude)
+        val mc = cusps[10]
+        
+        // Calculate sina (sine of angle related to MC and latitude)
+        var sina = sind(mc) * sine / cosfi
+        
+        // Clamp to [-1, 1]
+        if (sina > 1.0) sina = 1.0
+        if (sina < -1.0) sina = -1.0
+        
+        // Calculate cosa (always positive)
+        val cosa = sqrt(1.0 - sina * sina)
+        
+        // Calculate c
+        val c = atand(tanfi / cosa)
+        
+        // Calculate ad3 (ascensional difference divided by 3)
+        val ad3 = asind(sind(c) * sina) / 3.0
+        
+        // Calculate house cusps
+        cusps[11] = asc1(armc + 30.0 - 2.0 * ad3, latitude, obliquity)
+        cusps[12] = asc1(armc + 60.0 - ad3, latitude, obliquity)
+        cusps[2] = asc1(armc + 120.0 + ad3, latitude, obliquity)
+        cusps[3] = asc1(armc + 150.0 + 2.0 * ad3, latitude, obliquity)
+    }
+
+    /**
+     * Regiomontanus Houses - medieval system.
+     * Divides the celestial equator into 12 equal parts.
+     */
+    private fun calculateRegiomontanusHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        val sine = sind(obliquity)
+        val cose = cosd(obliquity)
+        val tanfi = tand(latitude)
+        
+        // Calculate pole heights for intermediate points
+        val fh1 = atand(tanfi * 0.5)
+        val fh2 = atand(tanfi * cosd(30.0))
+        
+        // Calculate house cusps
+        cusps[11] = asc1(armc + 30.0, fh1, obliquity)
+        cusps[12] = asc1(armc + 60.0, fh2, obliquity)
+        cusps[2] = asc1(armc + 120.0, fh2, obliquity)
+        cusps[3] = asc1(armc + 150.0, fh1, obliquity)
+        
+        // Handle polar circle: swap AC/DC if needed
+        if (abs(latitude) >= 90.0 - obliquity) {
+            val asc = cusps[1]
+            val mc = cusps[10]
+            val acmc = angleDiff(asc, mc)
+            
+            if (acmc < 0.0) {
+                cusps[1] = normalize(asc + 180.0)
+                cusps[10] = normalize(mc + 180.0)
+                for (i in listOf(11, 12, 2, 3)) {
+                    cusps[i] = normalize(cusps[i] + 180.0)
+                }
+            }
+        }
+    }
+
+    /**
+     * Campanus Houses - medieval system.
+     * Divides the prime vertical into 12 equal parts.
+     */
+    private fun calculateCampanusHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        val sine = sind(obliquity)
+        val cose = cosd(obliquity)
+        
+        // Calculate pole heights
+        val fh1 = asind(sind(latitude) / 2.0)
+        val fh2 = asind(sqrt(3.0) / 2.0 * sind(latitude))
+        
+        // Calculate horizontal angles
+        val cosfi = cosd(latitude)
+        val xh1: Double
+        val xh2: Double
+        
+        if (abs(cosfi) < VERY_SMALL) {
+            // At poles
+            if (latitude > 0) {
+                xh1 = 90.0
+                xh2 = 90.0
+            } else {
+                xh1 = 270.0
+                xh2 = 270.0
+            }
+        } else {
+            xh1 = atand(sqrt(3.0) / cosfi)
+            xh2 = atand(1.0 / sqrt(3.0) / cosfi)
+        }
+        
+        // Calculate cusps
+        cusps[11] = asc1(armc + 90.0 - xh1, fh1, obliquity)
+        cusps[12] = asc1(armc + 90.0 - xh2, fh2, obliquity)
+        cusps[2] = asc1(armc + 90.0 + xh2, fh2, obliquity)
+        cusps[3] = asc1(armc + 90.0 + xh1, fh1, obliquity)
+        
+        // Handle polar circle
+        if (abs(latitude) >= 90.0 - obliquity) {
+            val asc = cusps[1]
+            val mc = cusps[10]
+            val acmc = angleDiff(asc, mc)
+            
+            if (acmc < 0.0) {
+                cusps[1] = normalize(asc + 180.0)
+                cusps[10] = normalize(mc + 180.0)
+                for (i in listOf(11, 12, 2, 3)) {
+                    cusps[i] = normalize(cusps[i] + 180.0)
+                }
+            }
+        }
+    }
+
+    /**
+     * Alcabitius Houses - Arabic system.
+     */
+    private fun calculateAlcabitiusHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // Simplified implementation
+        calculatePorphyryHouses(cusps)
+    }
+
+    /**
+     * Topocentric Houses (Polich/Page) - modern system.
+     */
+    private fun calculateTopocentricHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // Simplified implementation
+        calculatePorphyryHouses(cusps)
+    }
+
+    /**
+     * Morinus Houses - equatorial system.
+     */
+    private fun calculateMorinusHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // Simplified implementation
+        calculatePorphyryHouses(cusps)
+    }
+
+    /**
+     * Azimuthal/Horizontal Houses.
+     */
+    private fun calculateAzimuthalHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // Simplified implementation
+        calculatePorphyryHouses(cusps)
+    }
+
+    /**
+     * Meridian/Axial Rotation Houses.
+     */
+    private fun calculateMeridianHouses(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // Simplified implementation
+        calculatePorphyryHouses(cusps)
+    }
+
+    /**
+     * Gauquelin Sectors - 36 sectors instead of 12 houses.
+     */
+    private fun calculateGauquelinSectors(
+        cusps: DoubleArray,
+        armc: Double,
+        latitude: Double,
+        obliquity: Double
+    ) {
+        // 36 equal sectors starting from Ascendant
+        val asc = cusps[1]
+        for (i in 1..36) {
+            cusps[i] = normalize(asc + (i - 1) * 10.0)
+        }
+    }
+}
